@@ -1,0 +1,13 @@
+CREATE TYPE rol_usuario AS ENUM ('ADMINISTRADOR', 'SOLICITANTE');
+CREATE TYPE estado_pedido AS ENUM ('PENDIENTE_APROBACION', 'PENDIENTE', 'ENTREGADO_PARCIAL', 'ENTREGADO', 'CANCELADO');
+CREATE TABLE usuarios (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL, email text NOT NULL UNIQUE, rol rol_usuario NOT NULL DEFAULT 'SOLICITANTE', activo boolean NOT NULL DEFAULT true);
+CREATE TABLE productos (id serial PRIMARY KEY, codigo text NOT NULL UNIQUE, descripcion text NOT NULL, unidad_medida text NOT NULL, categoria text NOT NULL, costo_unitario numeric(12,2) NOT NULL DEFAULT 0, cantidad_actual numeric(12,2) NOT NULL DEFAULT 0, stock_minimo numeric(12,2) NOT NULL DEFAULT 0);
+CREATE TABLE proveedores (id serial PRIMARY KEY, nombre text NOT NULL, cuit text, email text, activo boolean NOT NULL DEFAULT true);
+CREATE TABLE entradas_mercaderia (id serial PRIMARY KEY, producto_id integer NOT NULL REFERENCES productos(id), proveedor_id integer REFERENCES proveedores(id), cantidad numeric(12,2) NOT NULL, costo_unitario numeric(12,2) NOT NULL, usuario_id uuid NOT NULL REFERENCES usuarios(id), fecha timestamptz NOT NULL DEFAULT now());
+CREATE TABLE pedidos (id serial PRIMARY KEY, usuario_id uuid NOT NULL REFERENCES usuarios(id), pedido_padre_id integer REFERENCES pedidos(id), estado estado_pedido NOT NULL DEFAULT 'PENDIENTE_APROBACION', creado_en timestamptz NOT NULL DEFAULT now(), actualizado_en timestamptz NOT NULL DEFAULT now());
+CREATE TABLE pedido_items (id serial PRIMARY KEY, pedido_id integer NOT NULL REFERENCES pedidos(id), producto_id integer REFERENCES productos(id), descripcion_personalizada text, cantidad_solicitada numeric(12,2) NOT NULL, cantidad_entregada numeric(12,2) NOT NULL DEFAULT 0, CONSTRAINT pedido_item_catalogo_o_especial CHECK (producto_id IS NOT NULL OR descripcion_personalizada IS NOT NULL));
+CREATE TABLE actas_entrega (id serial PRIMARY KEY, pedido_id integer NOT NULL REFERENCES pedidos(id), solicitante_id uuid NOT NULL REFERENCES usuarios(id), responsable_id uuid NOT NULL REFERENCES usuarios(id), observaciones text, creada_en timestamptz NOT NULL DEFAULT now());
+CREATE TABLE pedido_historial_eventos (id serial PRIMARY KEY, pedido_id integer NOT NULL REFERENCES pedidos(id), usuario_id uuid REFERENCES usuarios(id), estado_anterior estado_pedido, estado_nuevo estado_pedido NOT NULL, descripcion text NOT NULL, creado_en timestamptz NOT NULL DEFAULT now(), metadata text NOT NULL DEFAULT '{}'::text);
+CREATE INDEX pedidos_usuario_idx ON pedidos(usuario_id);
+CREATE INDEX pedido_items_pedido_idx ON pedido_items(pedido_id);
+CREATE INDEX pedido_historial_pedido_idx ON pedido_historial_eventos(pedido_id, creado_en);
